@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String     @id @default(uuid())
+  name       String
+  email      String     @unique
+  properties Property[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Property {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  price        Float
+  city         String
+  area         String
+  pincode      String
+  propertyType String   // e.g., flat, villa, etc.
+  bhk          String?
+  bathrooms    Int?
+  areaSize     Float?
+  furnishing   String?  // e.g., furnished, semi-furnished
+  amenities    String[] // Array of strings is supported in PostgreSQL
+  status       String   @default("sale")
+  images       String[]
+  isVerified   Boolean  @default(false)
+  views        Int      @default(0)
+  viewedBy     String[]
+  
+  sellerId     String
+  seller       User     @relation(fields: [sellerId], references: [id])
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

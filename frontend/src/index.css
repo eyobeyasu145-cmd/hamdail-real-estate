@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+body {
+  font-family: 'Outfit', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-brand {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #D8C49A !important;
+  letter-spacing: 0.5px;
+}
+.navbar .nav-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #D8C49A !important;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+  color: #F8F5EC !important;
+}
+
+:root {
+  --forest: #064e3b;
+  --deep-green: #043b2e;
+}
+
+
+/* Hero background */
+.hero-section {
+  min-height: 580px;
+  background: url("./real-estate/hero-forest.jpg") center / cover;
+  animation: zoom 20s ease-in-out infinite alternate;
+}
+
+/* Dark overlay */
+.hero-overlay {
+  background: #043b2ecc;
+  pointer-events: none;
+}
+
+/* Animate hero content */
+.motion {
+  opacity: 0;
+  animation: slide-up .8s ease-out forwards;
+}
+
+.delay-1 { animation-delay: .1s; }
+.delay-2 { animation-delay: .3s; }
+.delay-3 { animation-delay: .5s; }
+.delay-4 { animation-delay: .7s; }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(25px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Background zoom */
+@keyframes zoom {
+  from { background-size: 100% auto; }
+  to { background-size: 115% auto; }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .hero-section, .motion { animation: none; }
+  .motion { opacity: 1; }
+}
