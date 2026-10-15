@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { API_URL } from "../../api";
+import SellerSidebar from "../../components/SellerSidebar";
 import {
   HiOutlineEye,
   HiOutlineUserGroup,
@@ -12,9 +14,6 @@ import {
   HiOutlineTrash,
   HiOutlineArrowPath,
 } from "react-icons/hi2";
-
-// Change this URL if your backend uses a different API route.
-const API_URL = "http://localhost:5000/api/properties";
 
 const formatPrice = (price) => {
   const amount = Number(price);
@@ -44,7 +43,7 @@ const getStatusClass = (status) => {
   }
 };
 
-export default function SellerDashboard() {
+export default function SellerDashboard({ isAdmin = false }) {
   const [properties, setProperties] = useState([]);
   const [stats, setStats] = useState({
     totalViews: 0,
@@ -72,7 +71,7 @@ export default function SellerDashboard() {
     setNotice("");
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(`${API_URL}/api/properties`, {
         method: "GET",
         headers: getHeaders(),
       });
@@ -227,7 +226,7 @@ export default function SellerDashboard() {
     setNotice("");
 
     try {
-      const response = await fetch(`${API_URL}/${encodeURIComponent(id)}`, {
+      const response = await fetch(`${API_URL}/api/properties/${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: getHeaders(),
       });
@@ -284,12 +283,19 @@ export default function SellerDashboard() {
 
   return (
     <div className="container-fluid bg-light min-vh-100 py-4">
+      <div className="container mb-4">
+        <SellerSidebar />
+      </div>
       <div className="container">
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
-            <h1 className="h3 fw-bold mb-1">Seller Dashboard</h1>
+            <h1 className="h3 fw-bold mb-1">
+              {isAdmin ? "Property Management" : "Seller Dashboard"}
+            </h1>
             <p className="text-secondary mb-0">
-              Manage your property listings in Dire Dawa.
+              {isAdmin
+                ? "Review and manage all property listings."
+                : "Manage your property listings in Dire Dawa."}
             </p>
           </div>
 
@@ -366,7 +372,9 @@ export default function SellerDashboard() {
           <div className="card-header bg-white border-0 pt-4 px-4">
             <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
               <div>
-                <h2 className="h5 fw-bold mb-1">Your Properties</h2>
+                <h2 className="h5 fw-bold mb-1">
+                  {isAdmin ? "All Properties" : "Your Properties"}
+                </h2>
                 <p className="text-secondary small mb-0">
                   Showing {filteredProperties.length} of {properties.length}{" "}
                   listings

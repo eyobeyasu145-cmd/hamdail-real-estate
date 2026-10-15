@@ -1,11 +1,21 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HiEye, HiEyeOff } from "react-icons/hi";
+import { useAuth } from "../../context/AuthContext";
+import { API_URL } from "../../api";
 import "./Auth.css";
 
 export default function Auth() {
   const navigate = useNavigate();
-  const [page, setPage] = useState("login");
+  const { pathname } = useLocation();
+  const { login } = useAuth();
+  const [page, setPage] = useState(
+    pathname === "/register"
+      ? "register"
+      : pathname.startsWith("/reset-password")
+        ? "reset"
+        : "login",
+  );
   const [name, setName] = useState("");
   const [role, setRole] = useState("buyer");
   const [email, setEmail] = useState("");
@@ -14,75 +24,79 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Demo login: redirect users according to their account role.
-  // Replace this with your backend login request when your API is ready.
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
     setMessage("");
 
-    const demoAccounts = {
-      "buyer@demo.com": { role: "buyer", name: "Demo Buyer" },
-      "seller@demo.com": { role: "seller", name: "Demo Seller" },
-      "admin@demo.com": { role: "admin", name: "Demo Admin" },
-    };
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to sign in.");
+      }
 
-    const account = demoAccounts[email.trim().toLowerCase()];
-
-    if (!account || password !== "demo1234") {
-      setMessage("Invalid email or password. Use one of the demo accounts.");
-      return;
-    }
-
-    // Store demo user information so the app can read the signed-in role.
-    localStorage.setItem("user", JSON.stringify(account));
-    localStorage.setItem("role", account.role);
-
-    if (account.role === "seller") {
-      navigate("/seller-dashboard");
-    } else if (account.role === "buyer") {
-      navigate("/properties");
-    } else if (account.role === "admin") {
-      navigate("/admin-dashboard");
-    } else {
-      navigate("/");
+      login(result.user, result.token);
+      if (result.user.role === "seller") {
+        navigate("/seller-dashboard");
+      } else if (result.user.role === "buyer") {
+        navigate("/properties");
+      } else if (result.user.role === "admin") {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/");
+      }
+    } catch (error) {
+      setMessage(error.message || "Unable to connect to the sign-in service.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // this is for Register
-  const handleRegister = (event) => {
+  const handleRegister = async (event) => {
     event.preventDefault();
-    if (password.length < 6) {
-      setMessage("Password must have at least 6 characters.");
+    if (password.length < 8) {
+      setMessage("Password must have at least 8 characters.");
       return;
     }
     if (password !== confirmPassword) {
       setMessage("Passwords do not match.");
       return;
     }
-    setMessage("Demo registration complete. Please sign in.");
-    setPage("login");
-    setPassword("");
-    setConfirmPassword("");
+
+    setLoading(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, role, email, password }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to create your account.");
+      }
+
+      setMessage("Your account was created. Please sign in.");
+      setPage("login");
+      setPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      setMessage(error.message || "Unable to connect to the registration service.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // this is for reset password
   const handleResetPassword = (event) => {
     event.preventDefault();
-    if (password.length < 6) {
-      setMessage("New password must have at least 6 characters.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match.");
-      return;
-    }
-    setMessage(
-      "Demo reset complete. Connect a backend to change a real password.",
-    );
-    setPage("login");
-    setPassword("");
-    setConfirmPassword("");
+    setMessage("Password reset is not configured yet. Please contact the administrator.");
   };
 
   const changePage = (nextPage) => {
@@ -173,7 +187,7 @@ export default function Auth() {
                 className="form-control"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
+                minLength={8}
                 required
               />
               <button
@@ -193,7 +207,7 @@ export default function Auth() {
                 className="form-control"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={6}
+                minLength={8}
                 required
               />
               <button
@@ -205,8 +219,8 @@ export default function Auth() {
                 {showConfirmPassword ? <HiEyeOff /> : <HiEye />}
               </button>
             </div>
-            <button className="btn btn-success w-100" type="submit">
-              Create Account
+            <button className="btn btn-success w-100" type="submit" disabled={loading}>
+              {loading ? "Creating account..." : "Create Account"}
             </button>
           </form>
         )}
@@ -230,7 +244,7 @@ export default function Auth() {
                 className="form-control"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
+                minLength={8}
                 required
               />
               <button
@@ -250,7 +264,7 @@ export default function Auth() {
                 className="form-control"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={6}
+                minLength={8}
                 required
               />
               <button
@@ -262,7 +276,7 @@ export default function Auth() {
                 {showConfirmPassword ? <HiEyeOff /> : <HiEye />}
               </button>
             </div>
-            <button className="btn btn-success w-100" type="submit">
+            <button className="btn btn-success w-100" type="submit" disabled={loading}>
               Reset Password
             </button>
           </form>
@@ -298,8 +312,8 @@ export default function Auth() {
                 {showPassword ? <HiEyeOff /> : <HiEye />}
               </button>
             </div>
-            <button className="btn btn-success w-100" type="submit">
-              Sign In
+            <button className="btn btn-success w-100" type="submit" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
             </button>
             <button
               type="button"
@@ -308,11 +322,6 @@ export default function Auth() {
             >
               Forgot password?
             </button>
-            <p className="small text-secondary mt-3 mb-0">
-              Demo accounts: buyer@demo.com, seller@demo.com, admin@demo.com
-              <br />
-              Password: demo1234
-            </p>
           </form>
         )}
 

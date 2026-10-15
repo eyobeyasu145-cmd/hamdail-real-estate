@@ -2,7 +2,6 @@ import { NavLink } from "react-router-dom";
 import {
   HiOutlineViewGrid,
   HiOutlineClipboardList,
-  HiOutlineChartBar,
   HiOutlineUser,
   HiOutlineSupport,
 } from "react-icons/hi";
@@ -14,8 +13,6 @@ const navItems = [
     icon: HiOutlineClipboardList,
     path: "/my-properties",
   },
-  { name: "Leads", icon: HiOutlineChartBar, path: "/inquiries" },
-  { name: "Messages", icon: HiOutlineViewGrid, path: "/chat-messages" },
   { name: "Profile", icon: HiOutlineUser, path: "/profile" },
   { name: "Support", icon: HiOutlineSupport, path: "/contact" },
 ];

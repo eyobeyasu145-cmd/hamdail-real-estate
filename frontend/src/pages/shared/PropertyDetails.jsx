@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { HiArrowLeft, HiLocationMarker } from "react-icons/hi";
-import mockProperties from "../../data/properties";
+import { API_URL } from "../../api";
 
 const formatPrice = (price) =>
   `ETB ${Number(price || 0).toLocaleString("en-ET")}`;
@@ -10,18 +10,42 @@ const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [property, setProperty] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const found = mockProperties.find((item) => String(item._id) === id);
-    setProperty(found || null);
+    const loadProperty = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const response = await fetch(`${API_URL}/api/properties/${encodeURIComponent(id)}`);
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || "This property could not be found.");
+        }
+        setProperty(result.property || null);
+      } catch (loadError) {
+        setError(loadError.message || "Unable to connect to the property service.");
+        setProperty(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProperty();
     window.scrollTo(0, 0);
   }, [id]);
+
+  if (loading) {
+    return <div className="container py-5 text-center">Loading property...</div>;
+  }
 
   if (!property) {
     return (
       <div className="container py-5 text-center">
         <h2>Property Not Found</h2>
-        <p className="text-secondary">This property could not be found.</p>
+        <p className="text-secondary">
+          {error || "This property could not be found."}
+        </p>
         <button
           className="btn btn-success"
           onClick={() => navigate("/properties")}

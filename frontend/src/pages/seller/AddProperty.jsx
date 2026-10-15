@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import "./AddProperties.css";
-
-const API_URL = "http://localhost:5000/api/properties";
+import { useAuth } from "../../context/AuthContext";
+import { API_URL } from "../../api";
 
 const commonAmenities = [
   "Parking",
@@ -99,7 +97,7 @@ function AddProperties() {
         data.append("images", image);
       });
 
-      const response = await fetch(API_URL, {
+      const response = await fetch(`${API_URL}/api/properties`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

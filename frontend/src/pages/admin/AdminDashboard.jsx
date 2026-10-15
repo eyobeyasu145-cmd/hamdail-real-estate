@@ -10,9 +10,8 @@ import {
   HiOutlineShieldCheck,
   HiOutlineGlobeAlt,
 } from "react-icons/hi2";
-
-// Change this URL to match your backend admin statistics route.
-const STATS_URL = "http://localhost:5000/api/admin/stats";
+import { API_URL } from "../../api";
+import AdminSidebar from "../../components/AdminSidebar";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -31,7 +30,7 @@ export default function AdminDashboard() {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(STATS_URL, {
+      const response = await fetch(`${API_URL}/api/admin/stats`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
@@ -123,6 +122,9 @@ export default function AdminDashboard() {
 
   return (
     <div className="container-fluid bg-light min-vh-100 py-4">
+      <div className="container mb-4">
+        <AdminSidebar />
+      </div>
       <div className="container">
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>

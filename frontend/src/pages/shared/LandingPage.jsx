@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   HiOfficeBuilding,
@@ -10,8 +10,8 @@ import {
   HiArrowRight,
 } from "react-icons/hi";
 
-import mockProperties from "../../data/properties";
 import PropertyCard from "../../components/common/PropertyCard";
+import { API_URL } from "../../api";
 import "./LandingPage.css";
 
 const categories = [
@@ -47,8 +47,27 @@ const features = [
 function LandingPage() {
   const navigate = useNavigate();
   const [location, setLocation] = useState("");
+  const [properties, setProperties] = useState([]);
+  const [error, setError] = useState("");
 
-  const featured = mockProperties.filter((p) => p.featured);
+  useEffect(() => {
+    fetch(`${API_URL}/api/properties`)
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Unable to load properties.");
+        setProperties(result.properties || []);
+      })
+      .catch((loadError) => {
+        setError(loadError.message || "Unable to connect to the property service.");
+      });
+  }, []);
+
+  const featured = properties.slice(0, 3);
+  const cityCount = new Set(properties.map((property) => property.city).filter(Boolean)).size;
+  const verifiedCount = properties.filter((property) => property.isVerified).length;
+  const verifiedPercent = properties.length
+    ? Math.round((verifiedCount / properties.length) * 100)
+    : 0;
 
   const search = (e) => {
     e.preventDefault();
@@ -83,9 +102,9 @@ function LandingPage() {
 
           <div className="row justify-content-center g-4 mt-4">
             {[
-              ["6+", "Properties Listed"],
-              ["4", "Cities"],
-              ["100%", "Verified"],
+              [properties.length, "Properties Listed"],
+              [cityCount, "Cities"],
+              [`${verifiedPercent}%`, "Verified"],
             ].map(([number, label]) => (
               <div className="col-4 col-md-2" key={label}>
                 <h2 className="fw-bold">{number}</h2>
@@ -104,15 +123,12 @@ function LandingPage() {
             <div className="col-6 col-lg-3" key={cat.type}>
               <button
                 className="category-card w-100 h-100"
-                onClick={() => navigate(`/properties?type=${cat.type}`)}
+                onClick={() => navigate(`/properties?propertyType=${cat.type}`)}
               >
                 <span className="category-icon">{cat.icon}</span>
                 <h5>{cat.name}</h5>
                 <small>
-                  {
-                    mockProperties.filter((p) => p.propertyType === cat.type)
-                      .length
-                  }{" "}
+                  {properties.filter((p) => p.propertyType === cat.type).length}{" "}
                   listings →
                 </small>
               </button>
@@ -134,13 +150,17 @@ function LandingPage() {
             </button>
           </div>
 
+          {error && <div className="alert alert-warning">{error}</div>}
           <div className="row g-4">
             {featured.map((property) => (
-              <div className="col-12 col-md-6 col-lg-4" key={property._id}>
+              <div className="col-12 col-md-6 col-lg-4" key={property._id || property.id}>
                 <PropertyCard property={property} />
               </div>
             ))}
           </div>
+          {!error && featured.length === 0 && (
+            <p className="text-secondary mb-0">No property listings are available yet.</p>
+          )}
         </div>
       </section>
 

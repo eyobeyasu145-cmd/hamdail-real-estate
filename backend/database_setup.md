@@ -1,165 +1,49 @@
-# PostgreSQL Database Setup Script
+# PostgreSQL backend setup
 
-You can copy and paste the entire SQL script below directly into your PostgreSQL query tool (such as **pgAdmin**, **DBeaver**, or the `psql` command line).
+This backend uses PostgreSQL through the `pg` driver. It does not connect to MongoDB, and it starts with an empty database. The server applies the versioned SQL migration in `migrations/` on startup.
 
----
+## 1. Create a PostgreSQL database
+
+Create a database named `realestate_db` using pgAdmin or `psql`:
 
 ```sql
--- ========================================================
--- 1. DATABASE CREATION (Run separately or in psql)
--- ========================================================
--- CREATE DATABASE realestate_db;
--- \c realestate_db;
-
--- ========================================================
--- 2. CREATE ENUM TYPES (Custom Statuses & Roles)
--- ========================================================
-DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('Admin', 'Agent', 'Owner', 'Tenant');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE property_status AS ENUM ('Available', 'Rented', 'Under Maintenance');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE lease_status AS ENUM ('Active', 'Terminated', 'Expired');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE payment_method AS ENUM ('Bank Transfer', 'Cash', 'Mobile Money', 'Cheque');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE payment_status AS ENUM ('Pending', 'Completed', 'Failed');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE maintenance_priority AS ENUM ('Low', 'Medium', 'High', 'Emergency');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE maintenance_status AS ENUM ('Pending', 'In Progress', 'Resolved');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- ========================================================
--- 3. USERS TABLE
--- ========================================================
-CREATE TABLE IF NOT EXISTS users (
-    user_id        SERIAL PRIMARY KEY,
-    first_name     VARCHAR(100) NOT NULL,
-    last_name      VARCHAR(100) NOT NULL,
-    email          VARCHAR(255) NOT NULL UNIQUE,
-    password_hash  TEXT NOT NULL,
-    role           user_role NOT NULL,
-    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- ========================================================
--- 4. PROPERTIES TABLE
--- ========================================================
-CREATE TABLE IF NOT EXISTS properties (
-    property_id    SERIAL PRIMARY KEY,
-    owner_id       INT NOT NULL,
-    agent_id       INT NOT NULL,
-    title          VARCHAR(255) NOT NULL,
-    description    TEXT NOT NULL,
-    address        TEXT NOT NULL,
-    price          NUMERIC(15, 2) NOT NULL,
-    status         property_status NOT NULL DEFAULT 'Available',
-    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_properties_owner
-        FOREIGN KEY (owner_id) REFERENCES users(user_id)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_properties_agent
-        FOREIGN KEY (agent_id) REFERENCES users(user_id)
-        ON DELETE RESTRICT
-);
-
--- ========================================================
--- 5. LEASES TABLE
--- ========================================================
-CREATE TABLE IF NOT EXISTS leases (
-    lease_id       SERIAL PRIMARY KEY,
-    property_id    INT NOT NULL,
-    tenant_id      INT NOT NULL,
-    start_date     DATE NOT NULL,
-    end_date       DATE NOT NULL,
-    rent_amount    NUMERIC(15, 2) NOT NULL,
-    status         lease_status NOT NULL DEFAULT 'Active',
-    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_leases_property
-        FOREIGN KEY (property_id) REFERENCES properties(property_id)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_leases_tenant
-        FOREIGN KEY (tenant_id) REFERENCES users(user_id)
-        ON DELETE RESTRICT
-);
-
--- ========================================================
--- 6. PAYMENTS TABLE
--- ========================================================
-CREATE TABLE IF NOT EXISTS payments (
-    payment_id     SERIAL PRIMARY KEY,
-    lease_id       INT NOT NULL,
-    amount         NUMERIC(15, 2) NOT NULL,
-    payment_date   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    payment_method payment_method NOT NULL,
-    status         payment_status NOT NULL DEFAULT 'Pending',
-    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_payments_lease
-        FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
-        ON DELETE RESTRICT
-);
-
--- ========================================================
--- 7. MAINTENANCE REQUESTS TABLE
--- ========================================================
-CREATE TABLE IF NOT EXISTS maintenance_requests (
-    request_id     SERIAL PRIMARY KEY,
-    property_id    INT NOT NULL,
-    tenant_id      INT NOT NULL,
-    description    TEXT NOT NULL,
-    priority       maintenance_priority NOT NULL DEFAULT 'Medium',
-    status         maintenance_status NOT NULL DEFAULT 'Pending',
-    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_maint_property
-        FOREIGN KEY (property_id) REFERENCES properties(property_id)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_maint_tenant
-        FOREIGN KEY (tenant_id) REFERENCES users(user_id)
-        ON DELETE RESTRICT
-);
-
--- ========================================================
--- 8. INDEXES FOR HIGH PERFORMANCE
--- ========================================================
-CREATE INDEX IF NOT EXISTS idx_properties_owner   ON properties(owner_id);
-CREATE INDEX IF NOT EXISTS idx_properties_agent   ON properties(agent_id);
-CREATE INDEX IF NOT EXISTS idx_leases_property    ON leases(property_id);
-CREATE INDEX IF NOT EXISTS idx_leases_tenant      ON leases(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_payments_lease     ON payments(lease_id);
-CREATE INDEX IF NOT EXISTS idx_maint_property     ON maintenance_requests(property_id);
-CREATE INDEX IF NOT EXISTS idx_maint_tenant       ON maintenance_requests(tenant_id);
+CREATE DATABASE realestate_db;
 ```
+
+## 2. Configure the backend
+
+Copy `.env.example` to `.env` in this directory and set:
+
+- `DATABASE_URL`: PostgreSQL connection string for `realestate_db`.
+- `JWT_SECRET`: a private random value of at least 32 characters. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+- `ADMIN_EMAIL` and `ADMIN_PASSWORD`: both are required to provision the first admin account. The admin is created or updated on each server start. Use a unique password of at least 8 characters.
+- `FRONTEND_URL`: the frontend origin, usually `http://localhost:5173`.
+- `UPLOAD_DIR` is optional; by default, uploaded images are stored in `backend/uploads`.
+
+Do not commit `.env` or share its values. For hosted PostgreSQL that requires TLS, set `DATABASE_SSL=true`; set `DATABASE_SSL_REJECT_UNAUTHORIZED=false` only when the provider requires it and its CA cannot be verified.
+The image directory must be on persistent storage in production; the backend serves uploaded image URLs from that directory.
+
+## 3. Install and run
+
+From the repository root:
+
+```powershell
+npm install --prefix backend
+npm --prefix backend run dev
+```
+
+The backend applies the initial migration and provisions the admin before listening on port 5000. Confirm the database connection at `http://localhost:5000/health`.
+
+Run the frontend with `npm --prefix frontend run dev`. Set `VITE_API_URL` in `frontend/.env` only if the backend is not at `http://localhost:5000`.
+
+## API used by the frontend
+
+- `POST /api/auth/register` creates buyer and seller accounts; admin accounts are only provisioned through environment variables.
+- `POST /api/auth/login` returns the user and a bearer token.
+- `GET /api/properties` lists public properties; authenticated sellers receive their own listings.
+- `GET /api/properties/:id`, `POST /api/properties`, `PUT /api/properties/:id`, and `DELETE /api/properties/:id` provide listing detail and seller management. Property images are stored locally in `uploads/`.
+- `GET /api/users/profile` and `PUT /api/users/profile` provide profile access and updates.
+- `POST /api/contact` stores contact form messages in PostgreSQL.
+- `GET /api/admin/stats` and `/api/admin/users` plus admin user status/delete routes require an admin token.
+
+Password reset and chat messaging are not configured yet. A reset is not completed by the frontend until a secure email/token delivery flow is added.

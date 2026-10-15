@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; // Change this path if your AuthContext is elsewhere.
-
-const API_URL = "http://localhost:5000/api/properties";
+import { useAuth } from "../../context/AuthContext";
+import { API_URL } from "../../api";
 
 const neighborhoods = [
   "Kezira",
@@ -84,7 +83,7 @@ export default function EditProperties() {
         setLoading(true);
         setError("");
 
-        const response = await fetch(`${API_URL}/${id}`, {
+        const response = await fetch(`${API_URL}/api/properties/${id}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
 
@@ -169,7 +168,7 @@ export default function EditProperties() {
       body.append("existingImages", JSON.stringify(existingImages));
       newImages.forEach((image) => body.append("images", image));
 
-      const response = await fetch(`${API_URL}/${id}`, {
+      const response = await fetch(`${API_URL}/api/properties/${id}`, {
         method: "PUT",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body,

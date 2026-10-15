@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { API_URL } from "../../api";
 
 function Profile() {
   const { user, setUser, token } = useAuth();
@@ -89,7 +90,7 @@ function Profile() {
         data.append("removeProfilePic", "true");
       }
 
-      const response = await fetch("http://localhost:5000/api/users/profile", {
+      const response = await fetch(`${API_URL}/api/users/profile`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,

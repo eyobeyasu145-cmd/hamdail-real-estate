@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 
 // Components
 import Navbar from "./components/common/Navbar";
@@ -9,11 +9,30 @@ import Properties from "./pages/shared/Properties";
 import PropertyDetails from "./pages/shared/PropertyDetails";
 import Contact from "./pages/shared/Contact";
 import SellerDashboard from "./pages/seller/SellerDashboard";
+import AddProperty from "./pages/seller/AddProperty";
+import EditProperty from "./pages/seller/EditProperty";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminContacts from "./pages/admin/AdminContacts";
 import Profile from "./pages/shared/Profile";
+import { useAuth } from "./context/AuthContext";
 
 // Authentication
 import Login from "./pages/auth/Login";
+
+function RequireRole({ roles, children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!roles.includes(user.role)) {
+    return (
+      <Navigate
+        to={user.role === "admin" ? "/admin-dashboard" : user.role === "seller" ? "/seller-dashboard" : "/properties"}
+        replace
+      />
+    );
+  }
+  return children;
+}
 
 function App() {
   return (
@@ -37,7 +56,14 @@ function App() {
 
                 {/* Property listings */}
                 <Route path="/properties" element={<Properties />} />
-                <Route path="/profile" element={<Profile />} />
+                <Route
+                  path="/profile"
+                  element={
+                    <RequireRole roles={["buyer", "seller", "admin"]}>
+                      <Profile />
+                    </RequireRole>
+                  }
+                />
 
                 {/* Property details */}
                 <Route path="/property/:id" element={<PropertyDetails />} />
@@ -46,10 +72,88 @@ function App() {
                 <Route path="/contact" element={<Contact />} />
 
                 {/* Seller dashboard */}
-                <Route path="/seller-dashboard" element={<SellerDashboard />} />
+                <Route
+                  path="/seller-dashboard"
+                  element={
+                    <RequireRole roles={["seller", "admin"]}>
+                      <SellerDashboard />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <RequireRole roles={["seller", "admin"]}>
+                      <SellerDashboard />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/my-properties"
+                  element={
+                    <RequireRole roles={["seller", "admin"]}>
+                      <SellerDashboard />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/admin/properties"
+                  element={
+                    <RequireRole roles={["admin"]}>
+                      <SellerDashboard isAdmin />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/add-property"
+                  element={
+                    <RequireRole roles={["seller", "admin"]}>
+                      <AddProperty />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/edit-property/:id"
+                  element={
+                    <RequireRole roles={["seller", "admin"]}>
+                      <EditProperty />
+                    </RequireRole>
+                  }
+                />
 
-                {/* Admin users */}
-                <Route path="/admin-users" element={<AdminUsers />} />
+                {/* Admin pages */}
+                <Route
+                  path="/admin-dashboard"
+                  element={
+                    <RequireRole roles={["admin"]}>
+                      <AdminDashboard />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/admin/users"
+                  element={
+                    <RequireRole roles={["admin"]}>
+                      <AdminUsers />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/admin-users"
+                  element={
+                    <RequireRole roles={["admin"]}>
+                      <AdminUsers />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/admin/contacts"
+                  element={
+                    <RequireRole roles={["admin"]}>
+                      <AdminContacts />
+                    </RequireRole>
+                  }
+                />
 
                 {/* Unknown page */}
                 <Route

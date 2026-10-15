@@ -1,7 +1,17 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { HiUserCircle } from "react-icons/hi";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Navbar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const dashboardPath =
+    user?.role === "admin"
+      ? "/admin-dashboard"
+      : user?.role === "seller"
+        ? "/seller-dashboard"
+        : "/properties";
+
   return (
     <nav
       className=" navbar navbar-expand-lg navbar-light shadow-sm sticky-top "
@@ -69,29 +79,45 @@ export default function Navbar() {
               </Link>
             </li>
 
-            {/* Desktop Login */}
-            <li className="nav-item border-start ps-lg-3 ms-lg-2 d-none d-lg-block">
-              <Link
-                className="nav-link d-flex align-items-center gap-2"
-                to="/login"
-                style={{ color: "#0d9488" }}
-              >
-                <HiUserCircle className="fs-4" />
-                Login
-              </Link>
-            </li>
-
-            {/* Mobile Login */}
-            <li className="nav-item d-lg-none">
-              <Link
-                className="nav-link d-flex align-items-center gap-2"
-                to="/login"
-                style={{ color: "#0d9488" }}
-              >
-                <HiUserCircle className="fs-4" />
-                Login
-              </Link>
-            </li>
+            {user ? (
+              <>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/profile">
+                    {user.name || "My profile"}
+                  </Link>
+                </li>
+                {user.role !== "buyer" && (
+                  <li className="nav-item">
+                    <Link className="nav-link" to={dashboardPath}>
+                      Dashboard
+                    </Link>
+                  </li>
+                )}
+                <li className="nav-item">
+                  <button
+                    className="btn btn-link nav-link"
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      navigate("/");
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </li>
+              </>
+            ) : (
+              <li className="nav-item border-start ps-lg-3 ms-lg-2">
+                <Link
+                  className="nav-link d-flex align-items-center gap-2"
+                  to="/login"
+                  style={{ color: "#0d9488" }}
+                >
+                  <HiUserCircle className="fs-4" />
+                  Login
+                </Link>
+              </li>
+            )}
           </ul>
         </div>
       </div>

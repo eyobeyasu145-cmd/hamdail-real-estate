@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { HiAdjustments, HiSearch, HiX } from "react-icons/hi";
 import PropertyCard from "../../components/common/PropertyCard";
-import mockProperties from "../../data/properties";
+import { API_URL } from "../../api";
 
 const propertyTypes = ["flat", "villa", "penthouse", "commercial"];
 const bhkOptions = ["1", "2", "3", "4", "5"];
@@ -17,16 +18,42 @@ const sortOptions = [
 const DEFAULT_MAX_PRICE = 150000000;
 
 const Properties = () => {
-  const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const [properties, setProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState(
+    searchParams.get("location") || searchParams.get("city") || "",
+  );
   const [filters, setFilters] = useState({
-    status: "all",
-    propertyType: [],
+    status: searchParams.get("status") || "all",
+    propertyType: searchParams.get("propertyType")
+      ? searchParams.get("propertyType").split(",")
+      : [],
     bhk: [],
     furnishing: [],
     maxPrice: DEFAULT_MAX_PRICE,
   });
   const [sort, setSort] = useState("latest");
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    const loadProperties = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/properties`);
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || "Unable to load properties.");
+        }
+        setProperties(result.properties || []);
+      } catch (loadError) {
+        setError(loadError.message || "Unable to connect to the properties service.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProperties();
+  }, []);
 
   const updateFilter = (name, value) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -54,7 +81,7 @@ const Properties = () => {
   };
 
   const filteredProperties = useMemo(() => {
-    let list = [...mockProperties];
+    let list = [...properties];
 
     if (search.trim()) {
       const query = search.trim().toLowerCase();
@@ -104,7 +131,7 @@ const Properties = () => {
     }
 
     return list;
-  }, [search, filters, sort]);
+  }, [properties, search, filters, sort]);
 
   const hasActiveFilters =
     search.trim() !== "" ||
@@ -311,15 +338,22 @@ const Properties = () => {
           {hasActiveFilters ? " (filtered)" : ""}
         </p>
 
+        {error && <div className="alert alert-danger">{error}</div>}
+        {loading && <p className="text-secondary">Loading properties...</p>}
+
         {filteredProperties.length === 0 ? (
           <div className="card border-0 shadow-sm text-center py-5">
             <div className="card-body">
               <div className="display-4 mb-3" aria-hidden="true">
                 🏠
               </div>
-              <h3 className="h4 fw-bold">No properties found</h3>
+              <h3 className="h4 fw-bold">
+                {loading ? "Loading properties" : "No properties found"}
+              </h3>
               <p className="text-secondary">
-                Try changing your search or filters.
+                {error
+                  ? "Please try again when the property service is available."
+                  : "Try changing your search or filters, or check back later."}
               </p>
               <button
                 type="button"

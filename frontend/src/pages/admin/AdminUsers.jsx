@@ -1,46 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-
-const initialUsers = [
-  {
-    id: 1,
-    name: "Abel Tesfaye",
-    email: "abel@example.com",
-    phone: "+251 911 123 456",
-    role: "buyer",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Hana Mohammed",
-    email: "hana@example.com",
-    phone: "+251 922 234 567",
-    role: "seller",
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Dawit Bekele",
-    email: "dawit@example.com",
-    phone: "+251 933 345 678",
-    role: "buyer",
-    status: "Inactive",
-  },
-  {
-    id: 4,
-    name: "Mekdes Ali",
-    email: "mekdes@example.com",
-    phone: "+251 944 456 789",
-    role: "admin",
-    status: "Active",
-  },
-];
+import { useAuth } from "../../context/AuthContext";
+import { API_URL } from "../../api";
 
 export default function AdminUsers() {
-  const [users, setUsers] = useState(initialUsers);
+  const { token } = useAuth();
+  const [users, setUsers] = useState([]);
   const [roleFilter, setRoleFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [openFilter, setOpenFilter] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const filterRef = useRef(null);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Unable to load users.");
+        setUsers(result.users || []);
+      } catch (loadError) {
+        setError(loadError.message || "Unable to connect to the user service.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) loadUsers();
+    else {
+      setError("Sign in as an admin to manage users.");
+      setLoading(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -60,34 +53,61 @@ export default function AdminUsers() {
       const matchesSearch =
         user.name.toLowerCase().includes(search) ||
         user.email.toLowerCase().includes(search) ||
-        user.phone.toLowerCase().includes(search);
+        String(user.phone || "").toLowerCase().includes(search);
 
       return matchesRole && matchesSearch;
     });
   }, [users, roleFilter, searchTerm]);
 
-  const toggleStatus = (userId) => {
-    setUsers((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === userId
-          ? {
-              ...user,
-              status: user.status === "Active" ? "Inactive" : "Active",
-            }
-          : user,
-      ),
-    );
+  const toggleStatus = async (user) => {
+    setError("");
+    setNotice("");
+    const status = user.status === "active" ? "inactive" : "active";
+    try {
+      const response = await fetch(
+        `${API_URL}/api/admin/users/${encodeURIComponent(user._id || user.id)}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Unable to update user.");
+      setUsers((current) =>
+        current.map((item) => (item._id === user._id ? result.user : item)),
+      );
+      setNotice("User status updated.");
+    } catch (updateError) {
+      setError(updateError.message || "Unable to update user.");
+    }
   };
 
-  const deleteUser = (userId) => {
+  const deleteUser = async (user) => {
     const confirmed = window.confirm(
-      "Are you sure you want to remove this user?",
+      `Remove ${user.name}? Users who own listings cannot be deleted.`,
     );
     if (!confirmed) return;
 
-    setUsers((currentUsers) =>
-      currentUsers.filter((user) => user.id !== userId),
-    );
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `${API_URL}/api/admin/users/${encodeURIComponent(user._id || user.id)}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Unable to delete user.");
+      setUsers((current) =>
+        current.filter((item) => (item._id || item.id) !== (user._id || user.id)),
+      );
+      setNotice("User deleted.");
+    } catch (deleteError) {
+      setError(deleteError.message || "Unable to delete user.");
+    }
   };
 
   const roleLabel = (role) => role.charAt(0).toUpperCase() + role.slice(1);
@@ -105,6 +125,9 @@ export default function AdminUsers() {
           {filteredUsers.length} users
         </span>
       </div>
+
+      {error && <div className="alert alert-danger">{error}</div>}
+      {notice && <div className="alert alert-success">{notice}</div>}
 
       <div className="card border-0 shadow-sm">
         <div className="card-body">
@@ -171,10 +194,10 @@ export default function AdminUsers() {
               <tbody>
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((user) => (
-                    <tr key={user.id}>
+                    <tr key={user._id || user.id}>
                       <td>
                         <div className="fw-semibold">{user.name}</div>
-                        <small className="text-secondary">ID: {user.id}</small>
+                        <small className="text-secondary">ID: {user._id || user.id}</small>
                       </td>
                       <td>
                         <span className="badge text-bg-light border">
@@ -188,12 +211,12 @@ export default function AdminUsers() {
                       <td>
                         <span
                           className={`badge ${
-                            user.status === "Active"
+                            user.status === "active"
                               ? "text-bg-success"
                               : "text-bg-secondary"
                           }`}
                         >
-                          {user.status}
+                          {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
                         </span>
                       </td>
                       <td className="text-end">
@@ -201,20 +224,20 @@ export default function AdminUsers() {
                           <button
                             type="button"
                             className={`btn btn-sm ${
-                              user.status === "Active"
+                              user.status === "active"
                                 ? "btn-outline-warning"
                                 : "btn-outline-success"
                             }`}
-                            onClick={() => toggleStatus(user.id)}
+                            onClick={() => toggleStatus(user)}
                           >
-                            {user.status === "Active"
+                            {user.status === "active"
                               ? "Deactivate"
                               : "Activate"}
                           </button>
                           <button
                             type="button"
                             className="btn btn-sm btn-outline-danger"
-                            onClick={() => deleteUser(user.id)}
+                            onClick={() => deleteUser(user)}
                           >
                             Delete
                           </button>
@@ -225,7 +248,7 @@ export default function AdminUsers() {
                 ) : (
                   <tr>
                     <td colSpan="5" className="text-center text-secondary py-5">
-                      No users match your search or selected role.
+                      {loading ? "Loading users..." : "No users match your search or selected role."}
                     </td>
                   </tr>
                 )}
@@ -235,11 +258,6 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      <p className="small text-secondary mt-3 mb-0">
-        Demo data only: changes are kept in component state and will reset when
-        the page reloads. Connect this component to your backend to manage real
-        user accounts.
-      </p>
     </div>
   );
 }

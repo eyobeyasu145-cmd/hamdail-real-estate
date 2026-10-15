@@ -9,6 +9,7 @@ import {
   HiPaperAirplane,
 } from "react-icons/hi";
 import { FaTelegram } from "react-icons/fa";
+import { API_URL } from "../../api";
 
 const CONTACT_INFO = {
   phone: "+251914907073",
@@ -27,6 +28,7 @@ export default function Contact() {
   });
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!sent) return;
@@ -39,16 +41,27 @@ export default function Contact() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    // Demo only: connect this form to your backend to send real messages.
-    setTimeout(() => {
-      setLoading(false);
+    setError("");
+    try {
+      const response = await fetch(`${API_URL}/api/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to submit your message.");
+      }
       setSent(true);
       setForm({ name: "", email: "", phone: "", message: "" });
-    }, 800);
+    } catch (submitError) {
+      setError(submitError.message || "Unable to connect to the contact service.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -120,13 +133,10 @@ export default function Contact() {
                   <div className="alert alert-success" role="status">
                     <HiCheckCircle className="me-2" />
                     Message submitted successfully.
-                    <small className="d-block mt-1">
-                      This is a demo confirmation; no message has been saved to
-                      a server.
-                    </small>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit}>
+                    {error && <div className="alert alert-danger">{error}</div>}
                     <div className="row g-3">
                       <div className="col-12 col-md-6">
                         <label htmlFor="name" className="form-label">
