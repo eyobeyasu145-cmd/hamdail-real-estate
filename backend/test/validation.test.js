@@ -6,6 +6,12 @@ import {
   publicProperty,
   publicUser,
 } from "../middleware/validation.js";
+import {
+  authCodeMatches,
+  generateAuthCode,
+  hashAuthCode,
+  passwordPolicyError,
+} from "../utils/authSecurity.js";
 
 test("parseStringArray accepts JSON arrays and comma-separated form values", () => {
   assert.deepEqual(parseStringArray('["Parking","Garden"]', "amenities"), [
@@ -38,16 +44,40 @@ test("publicUser omits the password hash", () => {
     name: "Buyer",
     email: "buyer@example.test",
     role: "buyer",
-    password_hash: "never-return-this",
+    passwordHash: "never-return-this",
     phone: null,
     address: null,
-    profile_pic: null,
+    profilePic: null,
     status: "active",
+    emailVerified: true,
   });
 
   assert.equal(user.id, "user-id");
   assert.equal(user.role, "buyer");
-  assert.equal("password_hash" in user, false);
+  assert.equal("passwordHash" in user, false);
+  assert.equal(user.emailVerified, true);
+});
+
+test("passwordPolicyError accepts strong passwords and rejects weak or oversized values", () => {
+  assert.equal(passwordPolicyError("Strong-Password-987!"), null);
+  assert.match(passwordPolicyError("short"), /12 characters/);
+  assert.match(passwordPolicyError("alllowercase123!"), /uppercase and lowercase/);
+  assert.match(passwordPolicyError(`Aa1!${"x".repeat(70)}`), /72 UTF-8 bytes/);
+});
+
+test("authentication code digests are purpose-bound and verify without storing plaintext", () => {
+  const testSecret = "test-only-secret-for-auth-code-unit-tests-123456";
+  const hash = hashAuthCode("user-id", "email_verification", "004201", testSecret);
+  assert.equal(hash.length, 64);
+  assert.equal(authCodeMatches(hash, "user-id", "email_verification", "004201", testSecret), true);
+  assert.equal(authCodeMatches(hash, "user-id", "password_reset", "004201", testSecret), false);
+  assert.equal(authCodeMatches(hash, "another-user", "email_verification", "004201", testSecret), false);
+});
+
+test("generated authentication codes are six digits", () => {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    assert.match(generateAuthCode(), /^\d{6}$/);
+  }
 });
 
 test("publicProperty translates PostgreSQL columns into frontend fields", () => {
@@ -56,28 +86,31 @@ test("publicProperty translates PostgreSQL columns into frontend fields", () => 
     title: "House",
     description: "A home",
     price: "5000000.00",
-    security_deposit: null,
+    securityDeposit: null,
     maintenance: "500.00",
     city: "Dire Dawa",
     area: "Kezira",
     pincode: "3000",
-    property_type: "house",
+    propertyType: "house",
     bhk: "3",
     bathrooms: 2,
-    area_size: "120.00",
+    areaSize: "120.00",
     furnishing: "unfurnished",
     amenities: ["Parking"],
     status: "sale",
     images: [],
-    is_verified: false,
+    isVerified: false,
     views: 0,
-    seller_id: "seller-id",
-    seller_name: "Seller",
-    seller_email: "seller@example.test",
-    seller_phone: null,
-    seller_profile_pic: null,
-    created_at: new Date("2026-01-01T00:00:00.000Z"),
-    updated_at: new Date("2026-01-01T00:00:00.000Z"),
+    sellerId: "seller-id",
+    seller: {
+      id: "seller-id",
+      name: "Seller",
+      email: "seller@example.test",
+      phone: null,
+      profilePic: null,
+    },
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   });
 
   assert.equal(property._id, "property-id");

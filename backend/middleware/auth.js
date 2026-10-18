@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { pool } from "../db.js";
+import { prisma } from "../db.js";
 
 export async function optionalAuth(req, res, next) {
   const authorization = req.get("authorization");
@@ -12,17 +12,36 @@ export async function optionalAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const { rows } = await pool.query(
-      `SELECT id, name, email, role, phone, address, profile_pic, status
-       FROM users WHERE id = $1`,
-      [payload.sub],
-    );
+    if (typeof payload === "string" || typeof payload.sub !== "string") {
+      return res.status(401).json({ message: "Your sign-in has expired. Please sign in again." });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        phone: true,
+        address: true,
+        profilePic: true,
+        status: true,
+        emailVerified: true,
+        tokenVersion: true,
+      },
+    });
 
-    if (!rows[0] || rows[0].status !== "active") {
+    if (!user || user.status !== "active") {
       return res.status(401).json({ message: "Your account is unavailable." });
     }
+    if (user.emailVerified !== true) {
+      return res.status(403).json({ message: "Please verify your email before continuing.", code: "EMAIL_NOT_VERIFIED" });
+    }
+    if (payload.ver !== user.tokenVersion) {
+      return res.status(401).json({ message: "Your sign-in has expired. Please sign in again." });
+    }
 
-    req.user = rows[0];
+    req.user = user;
     return next();
   } catch (error) {
     if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {

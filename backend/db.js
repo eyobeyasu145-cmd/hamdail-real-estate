@@ -1,22 +1,18 @@
-import pg from "pg";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const { Pool } = pg;
-
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required to connect to PostgreSQL.");
-}
-
-export const pool = new Pool({
+const globalForPrisma = globalThis;
+const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.DATABASE_SSL === "true"
-      ? {
-          rejectUnauthorized:
-            process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false",
-        }
-      : undefined,
 });
 
-pool.on("error", (error) => {
-  console.error("Unexpected PostgreSQL pool error:", error);
-});
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}

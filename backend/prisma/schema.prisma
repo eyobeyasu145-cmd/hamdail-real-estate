@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  buyer
+  seller
+  admin
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  active
+  inactive
+
+  @@map("user_status")
+}
+
+enum PropertyStatus {
+  sale
+  rent
+  sold
+  rented
+  active
+  pending
+
+  @@map("property_status")
+}
+
+enum ContactStatus {
+  unread
+  read
+
+  @@map("contact_status")
+}
+
+enum AuthCodePurpose {
+  email_verification
+  password_reset
+
+  @@map("auth_code_purpose")
+}
+
+model User {
+  id            String     @id @default(uuid()) @db.Uuid
+  name          String
+  email         String     @unique
+  passwordHash  String     @map("password_hash")
+  role          UserRole
+  phone         String?
+  address       String?
+  profilePic    String?    @map("profile_pic")
+  status        UserStatus @default(active)
+  emailVerified Boolean    @default(false) @map("email_verified")
+  tokenVersion  Int        @default(0) @map("token_version")
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  properties    Property[]
+  authCodes     AuthCode[]
+
+  @@map("users")
+}
+
+model AuthCode {
+  id        String          @id @default(uuid()) @db.Uuid
+  userId    String          @map("user_id") @db.Uuid
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   AuthCodePurpose
+  codeHash  String          @map("code_hash")
+  expiresAt DateTime        @map("expires_at") @db.Timestamptz
+  attempts  Int             @default(0)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([userId, purpose])
+  @@index([expiresAt])
+  @@map("auth_codes")
+}
+
+model Property {
+  id              String         @id @default(uuid()) @db.Uuid
+  title           String
+  description     String
+  price           Decimal        @db.Decimal(15, 2)
+  securityDeposit Decimal?       @map("security_deposit") @db.Decimal(15, 2)
+  maintenance     Decimal?       @db.Decimal(15, 2)
+  city            String
+  area            String
+  pincode         String
+  propertyType    String         @map("property_type")
+  bhk             String?
+  bathrooms       Int?
+  areaSize        Decimal?       @map("area_size") @db.Decimal(12, 2)
+  furnishing      String?
+  amenities       String[]       @default([])
+  status          PropertyStatus @default(sale)
+  images          String[]       @default([])
+  isVerified      Boolean        @default(false) @map("is_verified")
+  views           Int            @default(0)
+  sellerId        String         @map("seller_id") @db.Uuid
+  seller          User           @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([sellerId])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([city])
+  @@map("properties")
+}
+
+model ContactMessage {
+  id        String        @id @default(uuid()) @db.Uuid
+  name      String
+  email     String
+  phone     String
+  message   String
+  role      UserRole?
+  status    ContactStatus @default(unread)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt(sort: Desc)])
+  @@map("contact_messages")
+}

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../db.js";
+import { prisma } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { profileImage } from "../middleware/uploads.js";
 import { publicUser } from "../middleware/validation.js";
@@ -24,14 +24,11 @@ router.put("/profile", requireAuth, profileImage, async (req, res) => {
   const phone = String(req.body.phone || "").trim() || null;
   const address = String(req.body.address || "").trim() || null;
 
-  const { rows } = await pool.query(
-    `UPDATE users
-     SET name = $1, phone = $2, address = $3, profile_pic = $4, updated_at = NOW()
-     WHERE id = $5
-     RETURNING id, name, email, role, phone, address, profile_pic, status`,
-    [name, phone, address, profilePic, req.user.id],
-  );
-  return res.json({ success: true, user: publicUser(rows[0]) });
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
+    data: { name, phone, address, profilePic },
+  });
+  return res.json({ success: true, user: publicUser(user) });
 });
 
 export default router;

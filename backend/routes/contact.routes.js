@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../db.js";
+import { prisma } from "../db.js";
 import { optionalAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -24,11 +24,9 @@ router.post("/", optionalAuth, async (req, res) => {
     return res.status(400).json({ message: "Message is required and must be under 5000 characters." });
   }
 
-  await pool.query(
-    `INSERT INTO contact_messages (name, email, phone, message, role)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [name, email, phone, message, req.user?.role || null],
-  );
+  await prisma.contactMessage.create({
+    data: { name, email, phone, message, role: req.user?.role || null },
+  });
   return res.status(201).json({ success: true, message: "Message submitted successfully." });
 });
 

@@ -12,6 +12,8 @@ export default function Auth() {
   const [page, setPage] = useState(
     pathname === "/register"
       ? "register"
+      : pathname === "/verify-email"
+        ? "verify"
       : pathname.startsWith("/reset-password")
         ? "reset"
         : "login",
@@ -19,6 +21,8 @@ export default function Auth() {
   const [name, setName] = useState("");
   const [role, setRole] = useState("buyer");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,21 +30,47 @@ export default function Auth() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const postAuth = async (endpoint, body) => {
+    const response = await fetch(`${API_URL}/api/auth/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      const error = new Error(result.message || "The request could not be completed.");
+      error.code = result.code;
+      error.email = result.email;
+      throw error;
+    }
+    return result;
+  };
+
+  const checkPasswordStrength = (candidate) => {
+    if (candidate.length < 12) {
+      return "Password must have at least 12 characters.";
+    }
+    if (
+      !/[a-z]/.test(candidate) ||
+      !/[A-Z]/.test(candidate) ||
+      !/[0-9]/.test(candidate) ||
+      !/[^A-Za-z0-9]/.test(candidate)
+    ) {
+      return "Use uppercase and lowercase letters, a number, and a symbol.";
+    }
+    if (new TextEncoder().encode(candidate).length > 72) {
+      return "Password must be no more than 72 UTF-8 bytes.";
+    }
+    return null;
+  };
+
   const handleLogin = async (event) => {
     event.preventDefault();
     setMessage("");
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || "Unable to sign in.");
-      }
+      const result = await postAuth("login", { email, password });
 
       login(result.user, result.token);
       if (result.user.role === "seller") {
@@ -53,6 +83,10 @@ export default function Auth() {
         navigate("/");
       }
     } catch (error) {
+      if (error.code === "EMAIL_NOT_VERIFIED") {
+        setPage("verify");
+        setPassword("");
+      }
       setMessage(error.message || "Unable to connect to the sign-in service.");
     } finally {
       setLoading(false);
@@ -61,8 +95,9 @@ export default function Auth() {
 
   const handleRegister = async (event) => {
     event.preventDefault();
-    if (password.length < 8) {
-      setMessage("Password must have at least 8 characters.");
+    const passwordError = checkPasswordStrength(password);
+    if (passwordError) {
+      setMessage(passwordError);
       return;
     }
     if (password !== confirmPassword) {
@@ -73,30 +108,101 @@ export default function Auth() {
     setLoading(true);
     setMessage("");
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, role, email, password }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || "Unable to create your account.");
-      }
-
-      setMessage("Your account was created. Please sign in.");
-      setPage("login");
+      const result = await postAuth("register", { name, role, email, password });
+      setEmail(result.email || email);
+      setMessage(result.message);
+      setCode("");
+      setPage("verify");
       setPassword("");
       setConfirmPassword("");
     } catch (error) {
+      if (error.email) {
+        setEmail(error.email);
+        setPage("verify");
+      }
       setMessage(error.message || "Unable to connect to the registration service.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResetPassword = (event) => {
+  const handleVerifyEmail = async (event) => {
     event.preventDefault();
-    setMessage("Password reset is not configured yet. Please contact the administrator.");
+    setLoading(true);
+    setMessage("");
+    try {
+      const result = await postAuth("verify-email", { email, code });
+      setPage("login");
+      setPassword("");
+      setCode("");
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(error.message || "Unable to verify your email.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const result = await postAuth("resend-verification", { email });
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(error.message || "Unable to request a verification code.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setMessage("");
+    try {
+      if (!resetCodeSent) {
+        const result = await postAuth("forgot-password", { email });
+        setResetCodeSent(true);
+        setMessage(result.message);
+        return;
+      }
+
+      const passwordError = checkPasswordStrength(password);
+      if (passwordError) {
+        setMessage(passwordError);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setMessage("Passwords do not match.");
+        return;
+      }
+
+      const result = await postAuth("reset-password", { email, code, password });
+      setPage("login");
+      setPassword("");
+      setConfirmPassword("");
+      setCode("");
+      setResetCodeSent(false);
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(error.message || "Unable to reset your password.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendResetCode = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const result = await postAuth("forgot-password", { email });
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(error.message || "Unable to request a password reset code.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const changePage = (nextPage) => {
@@ -104,6 +210,8 @@ export default function Auth() {
     setMessage("");
     setPassword("");
     setConfirmPassword("");
+    setCode("");
+    setResetCodeSent(false);
     setShowPassword(false);
     setShowConfirmPassword(false);
   };
@@ -146,6 +254,7 @@ export default function Auth() {
         <h1 className="h4 mb-3">
           {page === "login" && "Welcome back"}
           {page === "register" && "Create an account"}
+          {page === "verify" && "Verify your email"}
           {page === "reset" && "Reset password"}
         </h1>
         {message && <div className="alert alert-info">{message}</div>}
@@ -187,7 +296,8 @@ export default function Auth() {
                 className="form-control"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={8}
+                minLength={12}
+                maxLength={72}
                 required
               />
               <button
@@ -199,6 +309,7 @@ export default function Auth() {
                 {showPassword ? <HiEyeOff /> : <HiEye />}
               </button>
             </div>
+            <p className="form-text">At least 12 characters with uppercase and lowercase letters, a number, and a symbol. Maximum 72 UTF-8 bytes.</p>
 
             <label className="form-label">Confirm password</label>
             <div className="input-group mb-3">
@@ -207,7 +318,8 @@ export default function Auth() {
                 className="form-control"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={8}
+                minLength={12}
+                maxLength={72}
                 required
               />
               <button
@@ -225,6 +337,42 @@ export default function Auth() {
           </form>
         )}
 
+        {page === "verify" && (
+          <form onSubmit={handleVerifyEmail}>
+            <p>Enter the six-digit code sent to your email address.</p>
+            <label className="form-label">Email address</label>
+            <input
+              type="email"
+              className="form-control mb-3"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <label className="form-label">Verification code</label>
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              className="form-control mb-3"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+            />
+            <button className="btn btn-success w-100" type="submit" disabled={loading}>
+              {loading ? "Verifying..." : "Verify Email"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-link w-100 mt-2"
+              onClick={handleResendVerification}
+              disabled={loading}
+            >
+              Resend verification code
+            </button>
+          </form>
+        )}
+
         {/* this is for reset password */}
         {page === "reset" && (
           <form onSubmit={handleResetPassword}>
@@ -237,48 +385,60 @@ export default function Auth() {
               required
             />
 
-            <label className="form-label">New password</label>
-            <div className="input-group mb-3">
-              <input
-                type={showPassword ? "text" : "password"}
-                className="form-control"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={8}
-                required
-              />
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label="Toggle password visibility"
-              >
-                {showPassword ? <HiEyeOff /> : <HiEye />}
+            {!resetCodeSent ? (
+              <button className="btn btn-success w-100" type="submit" disabled={loading}>
+                {loading ? "Sending code..." : "Send reset code"}
               </button>
-            </div>
-
-            <label className="form-label">Confirm new password</label>
-            <div className="input-group mb-3">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                className="form-control"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={8}
-                required
-              />
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                aria-label="Toggle confirm password visibility"
-              >
-                {showConfirmPassword ? <HiEyeOff /> : <HiEye />}
+            ) : (
+              <>
+                <p className="form-text">If a verified account matches this email, a reset code will be sent.</p>
+                <button
+                  type="button"
+                  className="btn btn-link w-100 mb-2"
+                  onClick={handleResendResetCode}
+                  disabled={loading}
+                >
+                  Resend reset code
+                </button>
+                <label className="form-label">Six-digit reset code</label>
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  className="form-control mb-3"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                />
+                <label className="form-label">New password</label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="form-control mb-3"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={12}
+                  maxLength={72}
+                  required
+                />
+                <p className="form-text">At least 12 characters with uppercase and lowercase letters, a number, and a symbol. Maximum 72 UTF-8 bytes.</p>
+                <label className="form-label">Confirm new password</label>
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  className="form-control mb-3"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  minLength={12}
+                  maxLength={72}
+                  required
+                />
+              </>
+            )}
+            {resetCodeSent && (
+              <button className="btn btn-success w-100" type="submit" disabled={loading}>
+                {loading ? "Resetting..." : "Reset Password"}
               </button>
-            </div>
-            <button className="btn btn-success w-100" type="submit" disabled={loading}>
-              Reset Password
-            </button>
+            )}
           </form>
         )}
 
