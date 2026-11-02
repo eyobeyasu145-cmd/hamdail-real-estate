@@ -19,9 +19,11 @@ const propertyWithSeller = {
       email: true,
       phone: true,
       profilePic: true,
+      role: true,
     },
   },
 };
+const serviceCity = "Dire Dawa";
 
 function uploadedImageUrls(req) {
   return (req.files || []).map(
@@ -38,7 +40,12 @@ function parsePropertyBody(body, { create = false } = {}) {
     if ((create || body[field] !== undefined) && !value) {
       throw new Error(`${field} is required.`);
     }
-    if (body[field] !== undefined) data[field] = value;
+    if (body[field] !== undefined) {
+      if (field === "city" && value.toLowerCase() !== serviceCity.toLowerCase()) {
+        throw new Error(`Hamdail Real Estate currently serves ${serviceCity} only.`);
+      }
+      data[field] = field === "city" ? serviceCity : value;
+    }
   }
 
   if (body.price !== undefined) {
@@ -91,11 +98,12 @@ async function requirePropertyOwner(req, res, next) {
 }
 
 router.get("/", optionalAuth, async (req, res) => {
-  const where = {};
-  if (req.user?.role === "seller") {
+  const where = { city: { equals: serviceCity, mode: "insensitive" } };
+  if (["seller", "agent"].includes(req.user?.role)) {
     where.sellerId = req.user.id;
   } else if (req.user?.role !== "admin") {
     where.status = { in: publicStatuses };
+    where.isVerified = true;
   }
 
   for (const field of ["city", "area", "propertyType", "bhk", "furnishing"]) {
@@ -103,6 +111,10 @@ router.get("/", optionalAuth, async (req, res) => {
     if (["propertyType", "bhk", "furnishing"].includes(field)) {
       const filters = String(req.query[field]).split(",").map((item) => item.trim()).filter(Boolean);
       if (filters.length) where[field] = { in: filters };
+    } else if (field === "city") {
+      where.AND = [
+        { city: { contains: String(req.query.city), mode: "insensitive" } },
+      ];
     } else {
       where[field] = {
         contains: String(req.query[field]),
@@ -165,7 +177,7 @@ router.get("/", optionalAuth, async (req, res) => {
   return res.json({ success: true, count: properties.length, properties });
 });
 
-router.post("/", requireAuth, requireRole("seller", "admin"), propertyImages, async (req, res) => {
+router.post("/", requireAuth, requireRole("seller", "agent", "admin"), propertyImages, async (req, res) => {
   let data;
   try {
     data = parsePropertyBody(req.body, { create: true });
@@ -177,10 +189,28 @@ router.post("/", requireAuth, requireRole("seller", "admin"), propertyImages, as
   if (images.length === 0) return res.status(400).json({ message: "Upload at least one property image." });
 
   const property = await prisma.property.create({
-    data: { ...data, images, sellerId: req.user.id },
+    data: { ...data, images, sellerId: req.user.id, isVerified: req.user.role === "admin" },
     include: propertyWithSeller,
   });
   return res.status(201).json({ success: true, property: publicProperty(property) });
+});
+
+router.patch("/:id/verification", requireAuth, requireRole("admin"), async (req, res) => {
+  if (typeof req.body.isVerified !== "boolean") {
+    return res.status(400).json({ message: "isVerified must be true or false." });
+  }
+  const existing = await prisma.property.findUnique({
+    where: { id: req.params.id },
+    select: { id: true },
+  });
+  if (!existing) return res.status(404).json({ message: "Property not found." });
+
+  const property = await prisma.property.update({
+    where: { id: existing.id },
+    data: { isVerified: req.body.isVerified },
+    include: propertyWithSeller,
+  });
+  return res.json({ success: true, property: publicProperty(property) });
 });
 
 router.get("/:id", optionalAuth, async (req, res) => {
@@ -192,7 +222,7 @@ router.get("/:id", optionalAuth, async (req, res) => {
 
   const isOwner = req.user?.id === row.sellerId;
   const canViewPrivate = isOwner || req.user?.role === "admin";
-  if (!canViewPrivate && !publicStatuses.includes(row.status)) {
+  if (!canViewPrivate && (!row.isVerified || !publicStatuses.includes(row.status))) {
     return res.status(404).json({ message: "Property not found." });
   }
   if (!canViewPrivate) {
@@ -210,7 +240,7 @@ router.get("/:id", optionalAuth, async (req, res) => {
 router.put(
   "/:id",
   requireAuth,
-  requireRole("seller", "admin"),
+  requireRole("seller", "agent", "admin"),
   requirePropertyOwner,
   propertyImages,
   async (req, res) => {
@@ -237,14 +267,18 @@ router.put(
 
     const property = await prisma.property.update({
       where: { id: req.property.id },
-      data: { ...data, images },
+      data: {
+        ...data,
+        images,
+        ...(req.user.role === "admin" ? {} : { isVerified: false }),
+      },
       include: propertyWithSeller,
     });
     return res.json({ success: true, property: publicProperty(property) });
   },
 );
 
-router.delete("/:id", requireAuth, requireRole("seller", "admin"), async (req, res) => {
+router.delete("/:id", requireAuth, requireRole("seller", "agent", "admin"), async (req, res) => {
   const property = await prisma.property.findUnique({
     where: { id: req.params.id },
     select: { id: true, sellerId: true },

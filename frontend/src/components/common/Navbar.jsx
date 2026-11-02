@@ -8,7 +8,7 @@ export default function Navbar() {
   const dashboardPath =
     user?.role === "admin"
       ? "/admin-dashboard"
-      : user?.role === "seller"
+    : ["seller", "agent"].includes(user?.role)
         ? "/seller-dashboard"
         : "/properties";
 

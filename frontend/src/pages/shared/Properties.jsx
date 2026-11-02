@@ -149,7 +149,7 @@ const Properties = () => {
         <div className="container">
           <h1 className="fw-bold mb-2">Find Your Property</h1>
           <p className="mb-4">
-            Browse available properties and find a place that suits you.
+            Browse available properties across Dire Dawa and find a place that suits you.
           </p>
 
           <div className="input-group bg-white rounded overflow-hidden shadow-sm">
@@ -159,7 +159,7 @@ const Properties = () => {
             <input
               type="search"
               className="form-control border-0 py-3"
-              placeholder="Search by property name, city, or locality..."
+              placeholder="Search by property name or neighborhood..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />

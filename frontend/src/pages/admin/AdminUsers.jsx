@@ -11,6 +11,8 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [agentForm, setAgentForm] = useState({ name: "", email: "", phone: "" });
+  const [creatingAgent, setCreatingAgent] = useState(false);
   const filterRef = useRef(null);
 
   useEffect(() => {
@@ -110,7 +112,37 @@ export default function AdminUsers() {
     }
   };
 
-  const roleLabel = (role) => role.charAt(0).toUpperCase() + role.slice(1);
+  const createAgent = async (event) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    setCreatingAgent(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/users/agents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(agentForm),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Unable to create agent account.");
+      setUsers((current) => [result.user, ...current]);
+      setAgentForm({ name: "", email: "", phone: "" });
+      setNotice(result.message || "Agent account created.");
+    } catch (createError) {
+      setError(createError.message || "Unable to create agent account.");
+    } finally {
+      setCreatingAgent(false);
+    }
+  };
+
+  const roleLabel = (role) => {
+    if (role === "seller") return "Owner";
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
 
   return (
     <div className="container-fluid py-4 px-3 px-md-4">
@@ -128,6 +160,56 @@ export default function AdminUsers() {
 
       {error && <div className="alert alert-danger">{error}</div>}
       {notice && <div className="alert alert-success">{notice}</div>}
+
+      <form className="card border-0 shadow-sm mb-4" onSubmit={createAgent}>
+        <div className="card-body">
+          <h3 className="h5 fw-bold">Add an employee agent</h3>
+          <p className="text-secondary">
+            Only admins can create agent accounts. After creation, the agent can use Forgot password to set their own password.
+          </p>
+          <div className="row g-3">
+            <div className="col-12 col-md-4">
+              <label className="form-label" htmlFor="agent-name">Name</label>
+              <input
+                id="agent-name"
+                className="form-control"
+                value={agentForm.name}
+                onChange={(event) => setAgentForm({ ...agentForm, name: event.target.value })}
+                maxLength={120}
+                required
+              />
+            </div>
+            <div className="col-12 col-md-4">
+              <label className="form-label" htmlFor="agent-email">Email</label>
+              <input
+                id="agent-email"
+                type="email"
+                className="form-control"
+                value={agentForm.email}
+                onChange={(event) => setAgentForm({ ...agentForm, email: event.target.value })}
+                maxLength={254}
+                required
+              />
+            </div>
+            <div className="col-12 col-md-3">
+              <label className="form-label" htmlFor="agent-phone">Phone (optional)</label>
+              <input
+                id="agent-phone"
+                type="tel"
+                className="form-control"
+                value={agentForm.phone}
+                onChange={(event) => setAgentForm({ ...agentForm, phone: event.target.value })}
+                maxLength={40}
+              />
+            </div>
+            <div className="col-12 col-md-1 d-flex align-items-end">
+              <button className="btn btn-success w-100" disabled={creatingAgent}>
+                {creatingAgent ? "Adding..." : "Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
 
       <div className="card border-0 shadow-sm">
         <div className="card-body">
@@ -156,7 +238,7 @@ export default function AdminUsers() {
 
                 {openFilter && (
                   <div className="dropdown-menu show position-absolute">
-                    {["all", "buyer", "seller", "admin"].map((role) => (
+                    {["all", "buyer", "seller", "agent", "admin"].map((role) => (
                       <button
                         type="button"
                         className={`dropdown-item ${

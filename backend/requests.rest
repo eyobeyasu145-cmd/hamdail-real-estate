@@ -1,0 +1,71 @@
+@baseUrl = http://localhost:5000
+
+### Check API and database connection
+GET {{baseUrl}}/health
+
+### Submit a contact message
+POST {{baseUrl}}/api/contact
+Content-Type: application/json
+
+{
+  "name": "Sam",
+  "email": "sam@example.com",
+  "phone": "+251911000000",
+  "message": "I am interested in a property."
+}
+
+### Register a user
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Sam",
+  "username": "sams",
+  "email": "sam@example.com",
+  "phone": "+251911000000",
+  "password": "YourStrongPassword123!",
+  "role": "buyer"
+}
+
+
+
+### Log in
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "sams",
+  "password": "YourStrongPassword123!"
+}
+
+# GET http://localhost:3000/posts
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiam9iIiwiaWF0IjoxNzcxNTAxODAxLCJleHAiOjE3NzE1MDE4MzZ9.Soy_LNeHnlgA1AW3urp6APv7INXm4nZkmsZGediW1Go
+# ###
+
+
+# POST http://localhost:4000/login
+# Content-Type: application/json
+
+# {
+#     "username":"job"
+# }
+
+# ###
+# GET http://localhost:3002/users
+
+# ###
+# post http://localhost:3002/users
+# Content-Type: application/json
+
+# {
+#     "user":"job4",
+#     "password" :"1234"
+# }
+# ###
+# post http://localhost:3002/user/login
+# Content-Type: application/json
+
+# {
+#    "user":"jobee",
+#     "password" :"1234" 
+# }

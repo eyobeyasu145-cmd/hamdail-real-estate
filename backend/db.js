@@ -1,5 +1,8 @@
+import net from "node:net";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+
+net.setDefaultAutoSelectFamily(false);
 
 const globalForPrisma = globalThis;
 const adapter = new PrismaPg({

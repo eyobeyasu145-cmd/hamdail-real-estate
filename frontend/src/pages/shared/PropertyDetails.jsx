@@ -175,16 +175,18 @@ const PropertyDetails = () => {
 
                 <hr />
 
-                <h2 className="h6 fw-bold">Contact Seller</h2>
+                <h2 className="h6 fw-bold">
+                  Contact {property.seller?.role === "agent" ? "Agent" : "Owner"}
+                </h2>
                 <p className="mb-2">
-                  {property.seller?.name || "Property Seller"}
+                  {property.seller?.name || "Property representative"}
                 </p>
                 {property.seller?.phone && (
                   <a
                     className="btn btn-success w-100 mb-2"
                     href={`tel:${property.seller.phone}`}
                   >
-                    Call Seller
+                    Call {property.seller?.role === "agent" ? "Agent" : "Owner"}
                   </a>
                 )}
                 {property.seller?.email && (
@@ -192,7 +194,7 @@ const PropertyDetails = () => {
                     className="btn btn-outline-success w-100"
                     href={`mailto:${property.seller.email}`}
                   >
-                    Email Seller
+                    Email {property.seller?.role === "agent" ? "Agent" : "Owner"}
                   </a>
                 )}
               </div>

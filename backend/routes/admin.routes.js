@@ -1,7 +1,10 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
 
 const router = Router();
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 router.get("/stats", async (req, res) => {
   const [totalUsers, totalProperties, activeListings, soldProperties] =
@@ -22,7 +25,7 @@ router.get("/users", async (req, res) => {
   const role = String(req.query.role || "");
   const users = await prisma.user.findMany({
     where: {
-      ...(role && ["buyer", "seller", "admin"].includes(role) ? { role } : {}),
+      ...(role && ["buyer", "seller", "agent", "admin"].includes(role) ? { role } : {}),
       ...(search
         ? {
             OR: [
@@ -53,6 +56,55 @@ router.get("/users", async (req, res) => {
       _id: user.id,
     })),
   });
+});
+
+router.post("/users/agents", async (req, res) => {
+  const name = String(req.body.name || "").trim();
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const phone = String(req.body.phone || "").trim();
+
+  if (!name || name.length > 120) {
+    return res.status(400).json({ message: "Enter the agent's name (up to 120 characters)." });
+  }
+  if (!emailPattern.test(email) || email.length > 254) {
+    return res.status(400).json({ message: "Enter a valid email address." });
+  }
+  if (phone.length > 40) {
+    return res.status(400).json({ message: "Phone number must be under 40 characters." });
+  }
+
+  try {
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        phone: phone || null,
+        passwordHash: await bcrypt.hash(`Aa1!${randomBytes(29).toString("base64url")}`, 12),
+        role: "agent",
+        emailVerified: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        status: true,
+        profilePic: true,
+        createdAt: true,
+      },
+    });
+    return res.status(201).json({
+      success: true,
+      user: { ...user, _id: user.id },
+      message: "Agent account created. Ask the agent to use Forgot password to set their own password.",
+    });
+  } catch (error) {
+    if (error.code === "P2002") {
+      return res.status(409).json({ message: "An account with this email already exists." });
+    }
+    throw error;
+  }
 });
 
 router.patch("/users/:id/status", async (req, res) => {

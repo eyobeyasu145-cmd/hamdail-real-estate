@@ -6,7 +6,7 @@ function createTransporter() {
   const host = process.env.SMTP_HOST?.trim();
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER?.trim();
-  const password = process.env.SMTP_PASSWORD;
+  const password = process.env.SMTP_PASSWORD?.replace(/\s/g, "");
   const from = process.env.EMAIL_FROM?.trim();
   const secure = process.env.SMTP_SECURE === "true";
 

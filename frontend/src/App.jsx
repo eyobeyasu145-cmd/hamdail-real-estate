@@ -26,7 +26,7 @@ function RequireRole({ roles, children }) {
   if (!roles.includes(user.role)) {
     return (
       <Navigate
-        to={user.role === "admin" ? "/admin-dashboard" : user.role === "seller" ? "/seller-dashboard" : "/properties"}
+        to={user.role === "admin" ? "/admin-dashboard" : ["seller", "agent"].includes(user.role) ? "/seller-dashboard" : "/properties"}
         replace
       />
     );
@@ -60,7 +60,7 @@ function App() {
                 <Route
                   path="/profile"
                   element={
-                    <RequireRole roles={["buyer", "seller", "admin"]}>
+                    <RequireRole roles={["buyer", "seller", "agent", "admin"]}>
                       <Profile />
                     </RequireRole>
                   }
@@ -76,7 +76,7 @@ function App() {
                 <Route
                   path="/seller-dashboard"
                   element={
-                    <RequireRole roles={["seller", "admin"]}>
+                    <RequireRole roles={["seller", "agent", "admin"]}>
                       <SellerDashboard />
                     </RequireRole>
                   }
@@ -84,7 +84,7 @@ function App() {
                 <Route
                   path="/dashboard"
                   element={
-                    <RequireRole roles={["seller", "admin"]}>
+                    <RequireRole roles={["seller", "agent", "admin"]}>
                       <SellerDashboard />
                     </RequireRole>
                   }
@@ -92,7 +92,7 @@ function App() {
                 <Route
                   path="/my-properties"
                   element={
-                    <RequireRole roles={["seller", "admin"]}>
+                    <RequireRole roles={["seller", "agent", "admin"]}>
                       <SellerDashboard />
                     </RequireRole>
                   }
@@ -108,7 +108,7 @@ function App() {
                 <Route
                   path="/add-property"
                   element={
-                    <RequireRole roles={["seller", "admin"]}>
+                    <RequireRole roles={["seller", "agent", "admin"]}>
                       <AddProperty />
                     </RequireRole>
                   }
@@ -116,7 +116,7 @@ function App() {
                 <Route
                   path="/edit-property/:id"
                   element={
-                    <RequireRole roles={["seller", "admin"]}>
+                    <RequireRole roles={["seller", "agent", "admin"]}>
                       <EditProperty />
                     </RequireRole>
                   }

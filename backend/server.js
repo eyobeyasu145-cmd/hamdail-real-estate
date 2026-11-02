@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import { passwordPolicyError } from "./utils/authSecurity.js";
+import { normalizePhoneNumber, normalizeUsername } from "./middleware/validation.js";
 
 dotenv.config();
 
@@ -145,6 +146,12 @@ async function provisionAdmin() {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("ADMIN_EMAIL must be a valid email address.");
   }
+  const phone = process.env.ADMIN_PHONE?.trim()
+    ? normalizePhoneNumber(process.env.ADMIN_PHONE)
+    : null;
+  const username = normalizeUsername(
+    process.env.ADMIN_USERNAME || email.split("@")[0],
+  );
 
   const { default: bcrypt } = await import("bcryptjs");
   const passwordHash = await bcrypt.hash(password, 12);
@@ -152,24 +159,137 @@ async function provisionAdmin() {
     where: { email },
     update: {
       name: process.env.ADMIN_NAME?.trim() || "Administrator",
+      username,
       passwordHash,
       role: "admin",
       status: "active",
       emailVerified: true,
+      phone,
       tokenVersion: { increment: 1 },
     },
     create: {
       name: process.env.ADMIN_NAME?.trim() || "Administrator",
+      username,
       email,
       passwordHash,
       role: "admin",
       emailVerified: true,
+      phone,
     },
   });
   console.log(`Initial admin account provisioned for ${email}.`);
 }
 
+async function provisionOwner() {
+  const name = process.env.OWNER_NAME?.trim();
+  const email = String(process.env.OWNER_EMAIL || "").trim().toLowerCase();
+  const password = process.env.OWNER_PASSWORD;
+  const phoneValue = process.env.OWNER_PHONE?.trim();
+  if (!name && !email && !password && !phoneValue) return;
+  if (!name || !email || !password || !phoneValue) {
+    throw new Error(
+      "Set OWNER_NAME, OWNER_EMAIL, OWNER_PASSWORD, and OWNER_PHONE together to provision the owner account.",
+    );
+  }
+  if (name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("OWNER_NAME or OWNER_EMAIL is invalid.");
+  }
+  const passwordError = passwordPolicyError(password);
+  if (passwordError) {
+    throw new Error(`OWNER_PASSWORD is invalid. ${passwordError}`);
+  }
+  const phone = normalizePhoneNumber(phoneValue);
+  const username = normalizeUsername(process.env.OWNER_USERNAME || email.split("@")[0]);
+  const adminEmail = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  if (adminEmail && adminEmail === email) {
+    throw new Error("OWNER_EMAIL and ADMIN_EMAIL must be different.");
+  }
+
+  const { default: bcrypt } = await import("bcryptjs");
+  const passwordHash = await bcrypt.hash(password, 12);
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      name,
+      username,
+      passwordHash,
+      role: "seller",
+      status: "active",
+      emailVerified: true,
+      phone,
+      tokenVersion: { increment: 1 },
+    },
+    create: {
+      name,
+      username,
+      email,
+      passwordHash,
+      role: "seller",
+      phone,
+      emailVerified: true,
+    },
+  });
+  console.log(`Initial owner account provisioned for ${email}.`);
+}
+
+async function provisionAgent() {
+  const name = process.env.AGENT_NAME?.trim();
+  const email = String(process.env.AGENT_EMAIL || "").trim().toLowerCase();
+  const password = process.env.AGENT_PASSWORD;
+  const phoneValue = process.env.AGENT_PHONE?.trim();
+  if (!name && !email && !password && !phoneValue) return;
+  if (!name || !email || !password || !phoneValue) {
+    throw new Error(
+      "Set AGENT_NAME, AGENT_EMAIL, AGENT_PASSWORD, and AGENT_PHONE together to provision the agent account.",
+    );
+  }
+  if (name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("AGENT_NAME or AGENT_EMAIL is invalid.");
+  }
+  const passwordError = passwordPolicyError(password);
+  if (passwordError) {
+    throw new Error(`AGENT_PASSWORD is invalid. ${passwordError}`);
+  }
+  const phone = normalizePhoneNumber(phoneValue);
+  const username = normalizeUsername(process.env.AGENT_USERNAME || email.split("@")[0]);
+  const reservedEmails = [
+    process.env.ADMIN_EMAIL,
+    process.env.OWNER_EMAIL,
+  ].map((reservedEmail) => String(reservedEmail || "").trim().toLowerCase());
+  if (reservedEmails.includes(email)) {
+    throw new Error("AGENT_EMAIL must be different from ADMIN_EMAIL and OWNER_EMAIL.");
+  }
+
+  const { default: bcrypt } = await import("bcryptjs");
+  const passwordHash = await bcrypt.hash(password, 12);
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      name,
+      username,
+      passwordHash,
+      role: "agent",
+      status: "active",
+      emailVerified: true,
+      phone,
+      tokenVersion: { increment: 1 },
+    },
+    create: {
+      name,
+      username,
+      email,
+      passwordHash,
+      role: "agent",
+      phone,
+      emailVerified: true,
+    },
+  });
+  console.log(`Initial agent account provisioned for ${email}.`);
+}
+
 await provisionAdmin();
+await provisionOwner();
+await provisionAgent();
 
 const port = Number(process.env.PORT || 5000);
 const server = await new Promise((resolve, reject) => {

@@ -111,8 +111,8 @@ function AddProperties() {
         throw new Error(result.message || "Failed to add property.");
       }
 
-      alert("Property added successfully!");
-      navigate("/properties");
+      alert("Property submitted for admin review. It will appear publicly after approval.");
+      navigate("/seller-dashboard");
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -172,6 +172,7 @@ function AddProperties() {
               name="city"
               value={formData.city}
               onChange={handleChange}
+              readOnly
               required
             />
           </div>
@@ -195,6 +196,20 @@ function AddProperties() {
               <option value="Other">Other</option>
             </select>
           </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label" htmlFor="property-pincode">Postal / ZIP code *</label>
+          <input
+            id="property-pincode"
+            className="form-control"
+            name="pincode"
+            value={formData.pincode}
+            onChange={handleChange}
+            autoComplete="postal-code"
+            placeholder="Enter the property's postal code"
+            required
+          />
         </div>
 
         {formData.area === "Other" && (

@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   parseOptionalNumber,
+  normalizePhoneNumber,
+  normalizeUsername,
   parseStringArray,
   publicProperty,
   publicUser,
@@ -38,10 +40,24 @@ test("parseOptionalNumber validates integer and decimal values", () => {
   assert.throws(() => parseOptionalNumber("not a number", "price"));
 });
 
+test("normalizePhoneNumber accepts international formats and rejects invalid numbers", () => {
+  assert.equal(normalizePhoneNumber("+251 911-000-000"), "+251911000000");
+  assert.equal(normalizePhoneNumber("(202) 555.0123"), "2025550123");
+  assert.throws(() => normalizePhoneNumber("12345"), /7 to 15 digits/);
+  assert.throws(() => normalizePhoneNumber("+251abc911000000"), /7 to 15 digits/);
+});
+
+test("normalizeUsername lowercases valid values and rejects invalid values", () => {
+  assert.equal(normalizeUsername("  Siyum-Luci_1 "), "siyum-luci_1");
+  assert.throws(() => normalizeUsername("ab"), /3 to 40 characters/);
+  assert.throws(() => normalizeUsername("not a username"), /3 to 40 characters/);
+});
+
 test("publicUser omits the password hash", () => {
   const user = publicUser({
     id: "user-id",
     name: "Buyer",
+    username: "buyer1",
     email: "buyer@example.test",
     role: "buyer",
     passwordHash: "never-return-this",
@@ -54,13 +70,15 @@ test("publicUser omits the password hash", () => {
 
   assert.equal(user.id, "user-id");
   assert.equal(user.role, "buyer");
+  assert.equal(user.username, "buyer1");
   assert.equal("passwordHash" in user, false);
   assert.equal(user.emailVerified, true);
 });
 
 test("passwordPolicyError accepts strong passwords and rejects weak or oversized values", () => {
+  assert.equal(passwordPolicyError("Ab1!xyz9"), null);
   assert.equal(passwordPolicyError("Strong-Password-987!"), null);
-  assert.match(passwordPolicyError("short"), /12 characters/);
+  assert.match(passwordPolicyError("Ab1!x"), /8 characters/);
   assert.match(passwordPolicyError("alllowercase123!"), /uppercase and lowercase/);
   assert.match(passwordPolicyError(`Aa1!${"x".repeat(70)}`), /72 UTF-8 bytes/);
 });

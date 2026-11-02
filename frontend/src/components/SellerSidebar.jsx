@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   HiOutlineViewGrid,
   HiOutlineClipboardList,
@@ -18,9 +19,10 @@ const navItems = [
 ];
 
 export default function SellerSidebar() {
+  const { user } = useAuth();
   return (
     <aside className="bg-dark text-white p-3 h-100">
-      <h5 className="mb-4">Seller Panel</h5>
+      <h5 className="mb-4">{user?.role === "agent" ? "Agent Panel" : "Seller Panel"}</h5>
 
       <nav className="nav flex-column gap-2">
         {navItems.map((item) => {

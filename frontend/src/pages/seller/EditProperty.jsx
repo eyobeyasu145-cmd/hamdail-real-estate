@@ -375,6 +375,7 @@ export default function EditProperties() {
                   name="city"
                   value={formData.city}
                   onChange={handleInputChange}
+                  readOnly
                   required
                 />
               </div>

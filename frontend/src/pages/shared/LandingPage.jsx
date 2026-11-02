@@ -63,7 +63,7 @@ function LandingPage() {
   }, []);
 
   const featured = properties.slice(0, 3);
-  const cityCount = new Set(properties.map((property) => property.city).filter(Boolean)).size;
+  const areaCount = new Set(properties.map((property) => property.area).filter(Boolean)).size;
   const verifiedCount = properties.filter((property) => property.isVerified).length;
   const verifiedPercent = properties.length
     ? Math.round((verifiedCount / properties.length) * 100)
@@ -81,10 +81,9 @@ function LandingPage() {
       {/* Hero */}
       <section className="hero text-white text-center">
         <div className="container py-5">
-          <h1 className="display-4 fw-bold mb-4">Find Your Dream Home Today</h1>
+          <h1 className="display-4 fw-bold mb-4">Find Your Home in Dire Dawa</h1>
           <p className="lead mb-5">
-            Find a house, apartment, or property that feels like home with
-            Hamdail Real Estate.
+            Browse homes for sale and rent across Dire Dawa, all in one place.
           </p>
 
           <form
@@ -93,7 +92,7 @@ function LandingPage() {
           >
             <input
               className="form-control border-0"
-              placeholder="Search by city or area"
+              placeholder="Search by neighborhood in Dire Dawa"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
             />
@@ -103,7 +102,7 @@ function LandingPage() {
           <div className="row justify-content-center g-4 mt-4">
             {[
               [properties.length, "Properties Listed"],
-              [cityCount, "Cities"],
+              [areaCount, "Neighborhoods"],
               [`${verifiedPercent}%`, "Verified"],
             ].map(([number, label]) => (
               <div className="col-4 col-md-2" key={label}>

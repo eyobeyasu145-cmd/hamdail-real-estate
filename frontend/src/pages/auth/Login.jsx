@@ -1,14 +1,35 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HiEye, HiEyeOff } from "react-icons/hi";
+import { FcGoogle } from "react-icons/fc";
 import { useAuth } from "../../context/AuthContext";
 import { API_URL } from "../../api";
 import "./Auth.css";
+
+let googleIdentityScriptPromise;
+
+function loadGoogleIdentityServices() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (!googleIdentityScriptPromise) {
+    googleIdentityScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("Google sign-in could not be loaded."));
+      document.head.appendChild(script);
+    });
+  }
+  return googleIdentityScriptPromise;
+}
 
 export default function Auth() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { login } = useAuth();
+  const googleButtonRef = useRef(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [page, setPage] = useState(
     pathname === "/register"
       ? "register"
@@ -19,7 +40,9 @@ export default function Auth() {
         : "login",
   );
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [role, setRole] = useState("buyer");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [resetCodeSent, setResetCodeSent] = useState(false);
@@ -28,6 +51,7 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState("");
+  const [googleError, setGoogleError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const postAuth = async (endpoint, body) => {
@@ -46,9 +70,64 @@ export default function Auth() {
     return result;
   };
 
+  useEffect(() => {
+    if (page !== "login" && page !== "register") return undefined;
+
+    if (!googleClientId) {
+      setGoogleError("");
+      return undefined;
+    }
+
+    let active = true;
+    setGoogleError("");
+    loadGoogleIdentityServices()
+      .then(() => {
+        if (!active || !googleButtonRef.current) return;
+
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async ({ credential }) => {
+            setLoading(true);
+            setMessage("");
+            try {
+              const result = await postAuth("google", { credential, role });
+              login(result.user, result.token);
+              if (["seller", "agent"].includes(result.user.role)) {
+                navigate("/seller-dashboard");
+              } else if (result.user.role === "admin") {
+                navigate("/admin-dashboard");
+              } else {
+                navigate("/properties");
+              }
+            } catch (error) {
+              setMessage(error.message || "Unable to sign in with Google.");
+            } finally {
+              setLoading(false);
+            }
+          },
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          type: "standard",
+          theme: "outline",
+          size: "large",
+          text: "continue_with",
+          shape: "rectangular",
+          width: Math.floor(googleButtonRef.current.getBoundingClientRect().width),
+        });
+      })
+      .catch((error) => {
+        if (active) setGoogleError(error.message);
+      });
+
+    return () => {
+      active = false;
+      if (googleButtonRef.current) googleButtonRef.current.replaceChildren();
+    };
+  }, [googleClientId, login, navigate, page, role]);
+
   const checkPasswordStrength = (candidate) => {
-    if (candidate.length < 12) {
-      return "Password must have at least 12 characters.";
+    if (candidate.length < 8) {
+      return "Password must have at least 8 characters.";
     }
     if (
       !/[a-z]/.test(candidate) ||
@@ -70,10 +149,10 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const result = await postAuth("login", { email, password });
+      const result = await postAuth("login", { identifier: email, password });
 
       login(result.user, result.token);
-      if (result.user.role === "seller") {
+      if (["seller", "agent"].includes(result.user.role)) {
         navigate("/seller-dashboard");
       } else if (result.user.role === "buyer") {
         navigate("/properties");
@@ -85,6 +164,7 @@ export default function Auth() {
     } catch (error) {
       if (error.code === "EMAIL_NOT_VERIFIED") {
         setPage("verify");
+        setEmail(error.email || email);
         setPassword("");
       }
       setMessage(error.message || "Unable to connect to the sign-in service.");
@@ -108,7 +188,7 @@ export default function Auth() {
     setLoading(true);
     setMessage("");
     try {
-      const result = await postAuth("register", { name, role, email, password });
+      const result = await postAuth("register", { name, username, role, phone, email, password });
       setEmail(result.email || email);
       setMessage(result.message);
       setCode("");
@@ -262,6 +342,9 @@ export default function Auth() {
         {/* this is for Register */}
         {page === "register" && (
           <form onSubmit={handleRegister}>
+            <p className="form-text">
+              Public registration is for buyers only. Owner, agent, and admin accounts are created by the administrator.
+            </p>
             <label className="form-label">Full name</label>
             <input
               className="form-control mb-3"
@@ -270,15 +353,34 @@ export default function Auth() {
               required
             />
 
-            <label className="form-label">Account type</label>
-            <select
-              className="form-select mb-3"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
-              <option value="buyer">Buyer</option>
-              <option value="seller">Seller</option>
-            </select>
+            <label className="form-label" htmlFor="registration-username">Username</label>
+            <input
+              id="registration-username"
+              type="text"
+              className="form-control mb-3"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              minLength={3}
+              maxLength={40}
+              pattern="[A-Za-z0-9._-]{3,40}"
+              title="Use 3 to 40 letters, numbers, dots, underscores, or hyphens."
+              required
+            />
+
+            <label className="form-label" htmlFor="registration-phone">Phone number</label>
+            <input
+              id="registration-phone"
+              type="tel"
+              className="form-control mb-3"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              placeholder="+251 911 000 000"
+              pattern="\+?[0-9\s().-]{7,25}"
+              title="Enter a phone number with 7 to 15 digits."
+              required
+            />
 
             <label className="form-label">Email address</label>
             <input
@@ -296,7 +398,7 @@ export default function Auth() {
                 className="form-control"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={12}
+                minLength={8}
                 maxLength={72}
                 required
               />
@@ -309,7 +411,7 @@ export default function Auth() {
                 {showPassword ? <HiEyeOff /> : <HiEye />}
               </button>
             </div>
-            <p className="form-text">At least 12 characters with uppercase and lowercase letters, a number, and a symbol. Maximum 72 UTF-8 bytes.</p>
+            <p className="form-text">At least 8 characters with uppercase and lowercase letters, a number, and a symbol. Maximum 72 UTF-8 bytes.</p>
 
             <label className="form-label">Confirm password</label>
             <div className="input-group mb-3">
@@ -318,7 +420,7 @@ export default function Auth() {
                 className="form-control"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={12}
+                minLength={8}
                 maxLength={72}
                 required
               />
@@ -391,7 +493,10 @@ export default function Auth() {
               </button>
             ) : (
               <>
-                <p className="form-text">If a verified account matches this email, a reset code will be sent.</p>
+                <p className="form-text">
+                  Reset codes are sent only to active, verified accounts. If you have not verified your email yet,
+                  verify it first.
+                </p>
                 <button
                   type="button"
                   className="btn btn-link w-100 mb-2"
@@ -417,23 +522,30 @@ export default function Auth() {
                   className="form-control mb-3"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  minLength={12}
+                  minLength={8}
                   maxLength={72}
                   required
                 />
-                <p className="form-text">At least 12 characters with uppercase and lowercase letters, a number, and a symbol. Maximum 72 UTF-8 bytes.</p>
+                <p className="form-text">At least 8 characters with uppercase and lowercase letters, a number, and a symbol. Maximum 72 UTF-8 bytes.</p>
                 <label className="form-label">Confirm new password</label>
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   className="form-control mb-3"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  minLength={12}
+                  minLength={8}
                   maxLength={72}
                   required
                 />
               </>
             )}
+            <button
+              type="button"
+              className="btn btn-link w-100"
+              onClick={() => changePage("verify")}
+            >
+              Verify email first
+            </button>
             {resetCodeSent && (
               <button className="btn btn-success w-100" type="submit" disabled={loading}>
                 {loading ? "Resetting..." : "Reset Password"}
@@ -445,12 +557,14 @@ export default function Auth() {
         {/* this is for login */}
         {page === "login" && (
           <form onSubmit={handleLogin}>
-            <label className="form-label">Email address</label>
+            <label className="form-label">Username or email address</label>
             <input
-              type="email"
+              type="text"
               className="form-control mb-3"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              placeholder="Enter your username or email"
               required
             />
 
@@ -483,6 +597,25 @@ export default function Auth() {
               Forgot password?
             </button>
           </form>
+        )}
+
+        {(page === "login" || page === "register") && (
+          <div className="mt-3">
+            <div className="auth-divider"><span>or</span></div>
+            {googleClientId ? (
+              <div className="google-sign-in-button" ref={googleButtonRef} />
+            ) : (
+              <button
+                type="button"
+                className="google-sign-in-fallback"
+                onClick={() => setMessage("Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID to enable it.")}
+              >
+                <FcGoogle aria-hidden="true" />
+                <span>Continue with Google</span>
+              </button>
+            )}
+            {googleError && <p className="small text-danger text-center mt-2 mb-0">{googleError}</p>}
+          </div>
         )}
 
         <p className="small text-center text-secondary mt-4 mb-0">

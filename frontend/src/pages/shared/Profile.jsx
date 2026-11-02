@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { API_URL } from "../../api";
 
+const MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
+const PROFILE_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
 function Profile() {
   const { user, setUser, token } = useAuth();
 
@@ -26,6 +34,11 @@ function Profile() {
     });
   }, [user]);
 
+  useEffect(() => {
+    if (!imagePreview) return undefined;
+    return () => URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -38,8 +51,19 @@ function Profile() {
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please select an image file.");
+    if (!PROFILE_IMAGE_TYPES.has(file.type)) {
+      setImageFile(null);
+      setImagePreview(null);
+      e.target.value = "";
+      setError("Choose a JPEG, PNG, WebP, or GIF image.");
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_SIZE) {
+      setImageFile(null);
+      setImagePreview(null);
+      e.target.value = "";
+      setError("Profile pictures must be no larger than 5 MB.");
       return;
     }
 
@@ -154,10 +178,13 @@ function Profile() {
                   <>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
                       className="form-control"
                       onChange={handleImageChange}
                     />
+                    <div className="form-text text-start">
+                      JPEG, PNG, WebP, or GIF. Maximum size: 5 MB.
+                    </div>
 
                     {(profileImage || imageFile) && (
                       <button

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { API_URL } from "../../api";
 import SellerSidebar from "../../components/SellerSidebar";
+import { useAuth } from "../../context/AuthContext";
 import {
   HiOutlineEye,
   HiOutlineUserGroup,
@@ -44,6 +45,7 @@ const getStatusClass = (status) => {
 };
 
 export default function SellerDashboard({ isAdmin = false }) {
+  const { user } = useAuth();
   const [properties, setProperties] = useState([]);
   const [stats, setStats] = useState({
     totalViews: 0,
@@ -247,6 +249,40 @@ export default function SellerDashboard({ isAdmin = false }) {
     }
   };
 
+  const handleVerification = async (property) => {
+    const id = property._id || property.id;
+    if (!id) {
+      setError("This property does not have an ID, so it cannot be reviewed.");
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(
+        `${API_URL}/api/properties/${encodeURIComponent(id)}/verification`,
+        {
+          method: "PATCH",
+          headers: getHeaders(),
+          body: JSON.stringify({ isVerified: !property.isVerified }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to update listing approval.");
+      }
+
+      setProperties((current) =>
+        current.map((item) =>
+          (item._id || item.id) === id ? result.property : item,
+        ),
+      );
+      setNotice(result.property.isVerified ? "Listing approved and published." : "Listing unpublished.");
+    } catch (verificationError) {
+      setError(verificationError.message || "Unable to update listing approval.");
+    }
+  };
+
   const statCards = [
     {
       title: "Total Views",
@@ -276,7 +312,7 @@ export default function SellerDashboard({ isAdmin = false }) {
         <div className="spinner-border text-success" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>
-        <p className="mt-3 text-secondary">Loading seller dashboard...</p>
+        <p className="mt-3 text-secondary">Loading dashboard...</p>
       </div>
     );
   }
@@ -290,7 +326,7 @@ export default function SellerDashboard({ isAdmin = false }) {
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
             <h1 className="h3 fw-bold mb-1">
-              {isAdmin ? "Property Management" : "Seller Dashboard"}
+              {isAdmin ? "Property Management" : user?.role === "agent" ? "Agent Dashboard" : "Owner Dashboard"}
             </h1>
             <p className="text-secondary mb-0">
               {isAdmin
@@ -507,12 +543,30 @@ export default function SellerDashboard({ isAdmin = false }) {
                             >
                               {property.status || "Unknown"}
                             </span>
+                            {isAdmin && (
+                              <div>
+                                <span className={`badge mt-1 ${property.isVerified ? "text-bg-success" : "text-bg-warning"}`}>
+                                  {property.isVerified ? "Approved" : "Needs review"}
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td>
                             {Number(property.views || 0).toLocaleString()}
                           </td>
                           <td className="text-end pe-4">
                             <div className="d-inline-flex gap-2">
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  className={`btn btn-sm ${property.isVerified ? "btn-outline-warning" : "btn-outline-success"}`}
+                                  onClick={() => handleVerification(property)}
+                                  aria-label={`${property.isVerified ? "Unpublish" : "Approve"} ${property.title || "property"}`}
+                                  title={property.isVerified ? "Unpublish listing" : "Approve listing"}
+                                >
+                                  {property.isVerified ? "Unpublish" : "Approve"}
+                                </button>
+                              )}
                               <Link
                                 to={id ? `/edit-property/${id}` : "#"}
                                 className={`btn btn-sm btn-outline-success ${id ? "" : "disabled"}`}
@@ -543,7 +597,7 @@ export default function SellerDashboard({ isAdmin = false }) {
         </div>
 
         <p className="small text-secondary text-center mt-4 mb-0">
-          Hamdail Real Estate · Seller Dashboard
+          Hamdail Real Estate · {user?.role === "agent" ? "Agent Dashboard" : isAdmin ? "Property Management" : "Owner Dashboard"}
         </p>
       </div>
     </div>

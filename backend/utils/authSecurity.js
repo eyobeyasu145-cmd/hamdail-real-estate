@@ -8,8 +8,8 @@ export function passwordPolicyError(password) {
   if (typeof password !== "string" || Buffer.byteLength(password, "utf8") > 72) {
     return "Password must be no more than 72 UTF-8 bytes.";
   }
-  if (password.length < 12) {
-    return "Password must have at least 12 characters.";
+  if (password.length < 8) {
+    return "Password must have at least 8 characters.";
   }
   if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) ||
       !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {

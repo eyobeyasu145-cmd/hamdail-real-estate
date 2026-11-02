@@ -28,11 +28,29 @@ export function parseOptionalNumber(value, fieldName, { integer = false } = {}) 
   return number;
 }
 
+export function normalizePhoneNumber(value) {
+  const phone = String(value ?? "").trim();
+  const digits = phone.replace(/\D/g, "");
+  if (!/^\+?[0-9\s().-]+$/.test(phone) || digits.length < 7 || digits.length > 15) {
+    throw new Error("Enter a valid phone number with 7 to 15 digits.");
+  }
+  return phone.replace(/[^\d+]/g, "");
+}
+
+export function normalizeUsername(value) {
+  const username = String(value ?? "").trim().toLowerCase();
+  if (!/^[a-z0-9._-]{3,40}$/.test(username)) {
+    throw new Error("Username must be 3 to 40 characters and use only letters, numbers, dots, underscores, or hyphens.");
+  }
+  return username;
+}
+
 export function publicUser(user) {
   return {
     _id: user.id,
     id: user.id,
     name: user.name,
+    username: user.username,
     email: user.email,
     role: user.role,
     phone: user.phone,
@@ -74,6 +92,7 @@ export function publicProperty(row) {
       email: row.seller.email,
       phone: row.seller.phone,
       profilePic: row.seller.profilePic,
+      role: row.seller.role,
     },
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

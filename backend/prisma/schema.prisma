@@ -9,6 +9,7 @@ datasource db {
 enum UserRole {
   buyer
   seller
+  agent
   admin
 
   @@map("user_role")
@@ -49,6 +50,7 @@ enum AuthCodePurpose {
 model User {
   id            String     @id @default(uuid()) @db.Uuid
   name          String
+  username      String     @unique
   email         String     @unique
   passwordHash  String     @map("password_hash")
   role          UserRole
